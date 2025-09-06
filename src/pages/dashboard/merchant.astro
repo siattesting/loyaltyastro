@@ -1,7 +1,8 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import { getCurrentUser } from '../../lib/auth';
-import { actions } from 'astro:actions';
+import { sql } from '../../lib/database';
+import { generateVoucherCode, generateVoucherQR } from '../../lib/qr';
 
 // Check authentication
 const user = getCurrentUser(Astro);
@@ -19,14 +20,40 @@ if (Astro.request.method === 'POST') {
     const action = formData.get('action');
     
     if (action === 'create_voucher') {
-      formData.set('merchant_id', user.id);
-      voucherResult = await actions.issueVoucher(formData);
+      const pointsValue = parseInt(formData.get('points_value') as string);
+      const description = formData.get('description') as string || null;
+      const expiresInDays = formData.get('expires_in_days') ? parseInt(formData.get('expires_in_days') as string) : null;
       
-      if (!voucherResult.data?.success) {
-        voucherError = voucherResult.data?.error || 'Failed to create voucher';
-      }
+      // Generate voucher code and expiration
+      const code = generateVoucherCode();
+      const expiresAt = expiresInDays 
+        ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000)
+        : null;
+      
+      // Create voucher in database
+      const [voucher] = await sql`
+        INSERT INTO vouchers (merchant_id, code, points_value, description, expires_at)
+        VALUES (${user.id}, ${code}, ${pointsValue}, ${description}, ${expiresAt})
+        RETURNING *
+      `;
+      
+      // Generate QR code
+      const qrCode = await generateVoucherQR(voucher.id, pointsValue, user.id);
+      
+      // Update voucher with QR code data
+      await sql`
+        UPDATE vouchers 
+        SET qr_code_data = ${qrCode}
+        WHERE id = ${voucher.id}
+      `;
+      
+      voucherResult = {
+        success: true,
+        voucher: { ...voucher, qr_code_data: qrCode }
+      };
     }
   } catch (e) {
+    console.error('Voucher creation error:', e);
     voucherError = 'Failed to create voucher. Please try again.';
   }
 }
@@ -34,14 +61,20 @@ if (Astro.request.method === 'POST') {
 // Get recent transactions
 let transactions = [];
 try {
-  const transactionResult = await actions.getTransactions({
-    user_id: user.id,
-    user_type: 'merchant',
-    limit: 10
-  });
-  if (transactionResult.data?.success) {
-    transactions = transactionResult.data.transactions;
-  }
+  transactions = await sql`
+    SELECT 
+      t.*,
+      c.name as customer_name,
+      c.email as customer_email,
+      m.name as merchant_name,
+      m.business_name
+    FROM transactions t
+    JOIN users c ON t.customer_id = c.id
+    JOIN users m ON t.merchant_id = m.id
+    WHERE t.merchant_id = ${user.id}
+    ORDER BY t.created_at DESC
+    LIMIT 10
+  `;
 } catch (e) {
   console.error('Failed to fetch transactions:', e);
 }
@@ -68,10 +101,10 @@ try {
         </div>
       )}
       
-      {voucherResult?.data?.success && (
+      {voucherResult?.success && (
         <div style="color: #2e7d32; background: #e8f5e8; padding: 1rem; border-radius: 4px; margin-bottom: 1rem;">
           <strong>Voucher Created Successfully!</strong><br/>
-          Code: <code>{voucherResult.data.voucher.code}</code>
+          Code: <code>{voucherResult.voucher.code}</code>
         </div>
       )}
       
