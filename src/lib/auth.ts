@@ -79,9 +79,9 @@ export async function registerUser(userData: {
     // Insert new user
     const [user] = await sql`
       INSERT INTO users (email, password_hash, name, phone, user_type, business_name, business_address)
-      VALUES (${userData.email}, ${passwordHash}, ${userData.name}, ${userData.phone}, ${userData.user_type}, ${userData.business_name}, ${userData.business_address})
+      VALUES (${userData.email}, ${passwordHash}, ${userData.name}, ${userData.phone || null}, ${userData.user_type}, ${userData.business_name || null}, ${userData.business_address || null})
       RETURNING id, email, name, phone, user_type, business_name, business_address
-    `;
+    ` as User[];
 
     // Initialize customer balance if it's a customer
     if (userData.user_type === 'customer') {
@@ -116,8 +116,8 @@ export async function loginUser(email: string, password: string): Promise<AuthRe
       return { success: false, error: 'Invalid credentials' };
     }
 
-    const { password_hash, ...userWithoutPassword } = user;
-    return { success: true, user: userWithoutPassword };
+    const { password_hash, ...userWithoutPassword } = user as any;
+    return { success: true, user: userWithoutPassword as User };
   } catch (error) {
     console.error('Login error:', error);
     return { success: false, error: 'Login failed' };

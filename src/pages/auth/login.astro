@@ -1,7 +1,6 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import { actions } from 'astro:actions';
-import { generateToken } from '../../lib/auth';
+import { loginUser, generateToken } from '../../lib/auth';
 
 let result = null;
 let error = null;
@@ -16,11 +15,14 @@ if (url.searchParams.get('registered') === 'true') {
 if (Astro.request.method === 'POST') {
   try {
     const formData = await Astro.request.formData();
-    result = await actions.login(formData);
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
     
-    if (result.data?.success && result.data.user) {
+    result = await loginUser(email, password);
+    
+    if (result.success && result.user) {
       // Generate JWT token
-      const token = generateToken(result.data.user);
+      const token = generateToken(result.user);
       
       // Set authentication cookie
       Astro.cookies.set('auth-token', token, {
@@ -32,15 +34,16 @@ if (Astro.request.method === 'POST') {
       });
       
       // Redirect based on user type
-      const redirectPath = result.data.user.user_type === 'merchant' 
+      const redirectPath = result.user.user_type === 'merchant' 
         ? '/dashboard/merchant' 
         : '/dashboard/customer';
       
       return Astro.redirect(redirectPath);
     } else {
-      error = result.data?.error || 'Login failed';
+      error = result.error || 'Login failed';
     }
   } catch (e) {
+    console.error('Login error:', e);
     error = 'Login failed. Please try again.';
   }
 }

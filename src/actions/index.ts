@@ -54,7 +54,7 @@ export const issueVoucher = defineAction({
       // Create voucher in database
       const [voucher] = await sql`
         INSERT INTO vouchers (merchant_id, code, points_value, description, expires_at)
-        VALUES (${input.merchant_id}, ${code}, ${input.points_value}, ${input.description}, ${expiresAt})
+        VALUES (${input.merchant_id}, ${code}, ${input.points_value}, ${input.description || null}, ${expiresAt})
         RETURNING *
       `;
 
