@@ -18,6 +18,13 @@ export default defineConfig({
     port: 5000
   },
   
+  // Allow all hosts for Replit proxy
+  vite: {
+    server: {
+      allowedHosts: true
+    }
+  },
+  
   // Enable server-side functionality
   
   output: 'server'
