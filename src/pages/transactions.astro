@@ -1,7 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import { getCurrentUser } from '../lib/auth';
-import { actions } from 'astro:actions';
+import { sql } from '../lib/database';
 
 // Check authentication
 const user = getCurrentUser(Astro);
@@ -22,20 +22,42 @@ const offset = (page - 1) * limit;
 let transactions = [];
 let totalCount = 0;
 try {
-  const result = await actions.getTransactions({
-    user_id: user.id,
-    user_type: user.user_type,
-    transaction_type: transactionType === 'all' ? undefined : transactionType,
-    date_from: dateFrom || undefined,
-    date_to: dateTo || undefined,
-    limit: limit,
-    offset: offset
-  });
-  
-  if (result.data?.success) {
-    transactions = result.data.transactions;
-    totalCount = result.data.transactions.length; // Note: In real app, you'd get total count separately
+  // Get transactions based on user type
+  if (user.user_type === 'customer') {
+    transactions = await sql`
+      SELECT 
+        t.*,
+        c.name as customer_name,
+        c.email as customer_email,
+        m.name as merchant_name,
+        m.business_name
+      FROM transactions t
+      JOIN users c ON t.customer_id = c.id
+      JOIN users m ON t.merchant_id = m.id
+      WHERE t.customer_id = ${user.id}
+      ORDER BY t.created_at DESC
+      LIMIT ${limit}
+      OFFSET ${offset}
+    `;
+  } else {
+    transactions = await sql`
+      SELECT 
+        t.*,
+        c.name as customer_name,
+        c.email as customer_email,
+        m.name as merchant_name,
+        m.business_name
+      FROM transactions t
+      JOIN users c ON t.customer_id = c.id
+      JOIN users m ON t.merchant_id = m.id
+      WHERE t.merchant_id = ${user.id}
+      ORDER BY t.created_at DESC
+      LIMIT ${limit}
+      OFFSET ${offset}
+    `;
   }
+  
+  totalCount = transactions.length;
 } catch (e) {
   console.error('Failed to fetch transactions:', e);
 }

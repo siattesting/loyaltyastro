@@ -1,0 +1,16 @@
+---
+import { getCurrentUser } from '../lib/auth';
+
+// Check authentication and redirect to appropriate dashboard
+const user = getCurrentUser(Astro);
+if (!user) {
+  return Astro.redirect('/auth/login');
+}
+
+// Redirect based on user type
+const redirectPath = user.user_type === 'merchant' 
+  ? '/dashboard/merchant' 
+  : '/dashboard/customer';
+
+return Astro.redirect(redirectPath);
+---
