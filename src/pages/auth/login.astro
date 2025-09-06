@@ -1,0 +1,84 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { actions } from 'astro:actions';
+import { generateToken } from '../../lib/auth';
+
+let result = null;
+let error = null;
+let successMessage = null;
+
+// Check for registration success message
+const url = new URL(Astro.request.url);
+if (url.searchParams.get('registered') === 'true') {
+  successMessage = 'Account created successfully! Please sign in.';
+}
+
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+    result = await actions.login(formData);
+    
+    if (result.data?.success && result.data.user) {
+      // Generate JWT token
+      const token = generateToken(result.data.user);
+      
+      // Set authentication cookie
+      Astro.cookies.set('auth-token', token, {
+        path: '/',
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax'
+      });
+      
+      // Redirect based on user type
+      const redirectPath = result.data.user.user_type === 'merchant' 
+        ? '/dashboard/merchant' 
+        : '/dashboard/customer';
+      
+      return Astro.redirect(redirectPath);
+    } else {
+      error = result.data?.error || 'Login failed';
+    }
+  } catch (e) {
+    error = 'Login failed. Please try again.';
+  }
+}
+---
+
+<Layout title="Login - AfriLoyalty">
+  <div class="card" style="max-width: 400px; margin: 2rem auto;">
+    <h2>Welcome Back</h2>
+    <p>Sign in to your AfriLoyalty account</p>
+    
+    {successMessage && (
+      <div style="color: #2e7d32; background: #e8f5e8; padding: 1rem; border-radius: 4px; margin-bottom: 1rem;">
+        {successMessage}
+      </div>
+    )}
+    
+    {error && (
+      <div style="color: #d32f2f; background: #ffebee; padding: 1rem; border-radius: 4px; margin-bottom: 1rem;">
+        {error}
+      </div>
+    )}
+    
+    <form method="POST">
+      <label>
+        Email Address
+        <input type="email" name="email" required placeholder="your@email.com" />
+      </label>
+      
+      <label>
+        Password
+        <input type="password" name="password" required placeholder="Your password" />
+      </label>
+      
+      <button type="submit" style="margin-top: 1rem;">Sign In</button>
+    </form>
+    
+    <p style="text-align: center; margin-top: 1rem;">
+      Don't have an account? <a href="/auth/register">Create one here</a>
+    </p>
+  </div>
+</Layout>

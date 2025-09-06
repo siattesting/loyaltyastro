@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:password@db:5432/loyalty_app
+      - PGHOST=db
+      - PGPORT=5432
+      - PGUSER=postgres
+      - PGPASSWORD=password
+      - PGDATABASE=loyalty_app
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+    depends_on:
+      - db
+    networks:
+      - loyalty-network
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=loyalty_app
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - loyalty-network
+
+volumes:
+  postgres_data:
+
+networks:
+  loyalty-network:
+    driver: bridge

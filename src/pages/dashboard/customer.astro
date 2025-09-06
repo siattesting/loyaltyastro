@@ -1,0 +1,255 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getCurrentUser } from '../../lib/auth';
+import { actions } from 'astro:actions';
+
+// Check authentication
+const user = getCurrentUser(Astro);
+if (!user || user.user_type !== 'customer') {
+  return Astro.redirect('/auth/login');
+}
+
+let redeemResult = null;
+let redeemError = null;
+
+// Handle voucher redemption
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+    const action = formData.get('action');
+    
+    if (action === 'redeem_voucher') {
+      formData.set('customer_id', user.id);
+      redeemResult = await actions.redeemVoucher(formData);
+      
+      if (!redeemResult.data?.success) {
+        redeemError = redeemResult.data?.error || 'Failed to redeem voucher';
+      }
+    }
+  } catch (e) {
+    redeemError = 'Failed to redeem voucher. Please try again.';
+  }
+}
+
+// Get customer balance
+let balance = 0;
+try {
+  const balanceResult = await actions.getCustomerBalance({
+    customer_id: user.id
+  });
+  if (balanceResult.data?.success) {
+    balance = balanceResult.data.balance;
+  }
+} catch (e) {
+  console.error('Failed to fetch balance:', e);
+}
+
+// Get recent transactions
+let transactions = [];
+try {
+  const transactionResult = await actions.getTransactions({
+    user_id: user.id,
+    user_type: 'customer',
+    limit: 10
+  });
+  if (transactionResult.data?.success) {
+    transactions = transactionResult.data.transactions;
+  }
+} catch (e) {
+  console.error('Failed to fetch transactions:', e);
+}
+---
+
+<Layout title="Customer Dashboard - AfriLoyalty">
+  <div class="hero">
+    <h1>🎯 Customer Dashboard</h1>
+    <p>Welcome back, {user.name}!</p>
+    <div class="points-badge" style="margin-top: 1rem; font-size: 1.25rem;">
+      {balance} Loyalty Points
+    </div>
+    <div style="margin-top: 1rem;">
+      <a href="/auth/logout" role="button" class="secondary">Logout</a>
+    </div>
+  </div>
+
+  <div class="grid">
+    <!-- Redeem Voucher Section -->
+    <section class="card">
+      <h3>🎫 Redeem Voucher</h3>
+      <p>Enter a voucher code or scan a QR code to earn points</p>
+      
+      {redeemError && (
+        <div style="color: #d32f2f; background: #ffebee; padding: 1rem; border-radius: 4px; margin-bottom: 1rem;">
+          {redeemError}
+        </div>
+      )}
+      
+      {redeemResult?.data?.success && (
+        <div style="color: #2e7d32; background: #e8f5e8; padding: 1rem; border-radius: 4px; margin-bottom: 1rem;">
+          <strong>Voucher Redeemed Successfully!</strong><br/>
+          You earned {redeemResult.data.points_earned} points!
+          {redeemResult.data.description && <span><br/>Description: {redeemResult.data.description}</span>}
+        </div>
+      )}
+      
+      <form method="POST">
+        <input type="hidden" name="action" value="redeem_voucher" />
+        
+        <label>
+          Voucher Code
+          <input type="text" name="voucher_code" placeholder="VCH12345678" style="text-transform: uppercase;" />
+        </label>
+        
+        <button type="submit" style="margin-top: 1rem;">Redeem Voucher</button>
+      </form>
+      
+      <div style="text-align: center; margin: 1rem 0;">
+        <strong>OR</strong>
+      </div>
+      
+      <button id="scan-qr" role="button" class="secondary" style="width: 100%;">
+        📱 Scan QR Code
+      </button>
+      
+      <div id="qr-scanner" style="display: none; margin-top: 1rem;">
+        <video id="qr-video" style="width: 100%; max-width: 300px; border-radius: 4px;"></video>
+        <button id="stop-scan" role="button" class="secondary" style="margin-top: 0.5rem;">Stop Scanning</button>
+      </div>
+    </section>
+
+    <!-- Quick Actions -->
+    <section class="card">
+      <h3>⚡ Quick Actions</h3>
+      
+      <div style="display: flex; flex-direction: column; gap: 1rem;">
+        <a href="/transactions" role="button" class="secondary">
+          📊 View All Transactions
+        </a>
+        
+        <button id="share-profile" role="button" class="secondary">
+          📤 Share Profile QR
+        </button>
+        
+        <a href="/find-merchants" role="button" class="secondary">
+          🔍 Find Participating Merchants
+        </a>
+      </div>
+      
+      <div id="profile-qr" style="display: none; text-align: center; margin-top: 1rem;">
+        <canvas id="profile-qr-canvas"></canvas>
+        <p>Show this QR code to merchants to receive points</p>
+      </div>
+    </section>
+  </div>
+
+  <!-- Recent Transactions -->
+  <section class="card" style="margin-top: 2rem;">
+    <h3>📈 Recent Activity</h3>
+    
+    {transactions.length === 0 ? (
+      <p>No transactions yet. Start by redeeming your first voucher!</p>
+    ) : (
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Merchant</th>
+              <th>Type</th>
+              <th>Points</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            {transactions.map((tx) => (
+              <tr>
+                <td>{new Date(tx.created_at).toLocaleDateString()}</td>
+                <td>{tx.business_name || tx.merchant_name}</td>
+                <td class={tx.transaction_type === 'earned' ? 'earned' : 'redeemed'}>
+                  {tx.transaction_type === 'earned' ? '➕ Earned' : '➖ Redeemed'}
+                </td>
+                <td>{tx.points_amount}</td>
+                <td>{tx.description || '-'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </section>
+</Layout>
+
+<script>
+  // QR Scanner functionality (placeholder - would need QR scanner library in real implementation)
+  const scanButton = document.getElementById('scan-qr');
+  const scannerDiv = document.getElementById('qr-scanner');
+  const stopButton = document.getElementById('stop-scan');
+  const video = document.getElementById('qr-video');
+  
+  let stream = null;
+  
+  scanButton?.addEventListener('click', async () => {
+    try {
+      scannerDiv.style.display = 'block';
+      scanButton.style.display = 'none';
+      
+      // Request camera access
+      stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'environment' } 
+      });
+      video.srcObject = stream;
+      video.play();
+      
+      // Note: In a real implementation, you would use a QR scanner library here
+      // For now, we'll show a placeholder
+      setTimeout(() => {
+        alert('QR scanning would be implemented here using a library like qr-scanner');
+      }, 1000);
+      
+    } catch (error) {
+      alert('Camera access denied or not available');
+      stopScanning();
+    }
+  });
+  
+  stopButton?.addEventListener('click', stopScanning);
+  
+  function stopScanning() {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      stream = null;
+    }
+    scannerDiv.style.display = 'none';
+    scanButton.style.display = 'inline-block';
+  }
+  
+  // Profile QR code generation
+  const shareButton = document.getElementById('share-profile');
+  const profileQRDiv = document.getElementById('profile-qr');
+  
+  shareButton?.addEventListener('click', () => {
+    profileQRDiv.style.display = profileQRDiv.style.display === 'none' ? 'block' : 'none';
+    
+    if (profileQRDiv.style.display === 'block') {
+      // Generate profile QR code (placeholder)
+      const canvas = document.getElementById('profile-qr-canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = 200;
+      canvas.height = 200;
+      
+      // Simple placeholder QR code visualization
+      ctx.fillStyle = '#000';
+      for (let i = 0; i < 10; i++) {
+        for (let j = 0; j < 10; j++) {
+          if (Math.random() > 0.5) {
+            ctx.fillRect(i * 20, j * 20, 20, 20);
+          }
+        }
+      }
+      
+      shareButton.textContent = 'Hide Profile QR';
+    } else {
+      shareButton.textContent = '📤 Share Profile QR';
+    }
+  });
+</script>

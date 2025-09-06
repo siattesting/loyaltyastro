@@ -1,0 +1,170 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getCurrentUser } from '../../lib/auth';
+import { actions } from 'astro:actions';
+
+// Check authentication
+const user = getCurrentUser(Astro);
+if (!user || user.user_type !== 'merchant') {
+  return Astro.redirect('/auth/login');
+}
+
+let voucherResult = null;
+let voucherError = null;
+
+// Handle voucher creation
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+    const action = formData.get('action');
+    
+    if (action === 'create_voucher') {
+      formData.set('merchant_id', user.id);
+      voucherResult = await actions.issueVoucher(formData);
+      
+      if (!voucherResult.data?.success) {
+        voucherError = voucherResult.data?.error || 'Failed to create voucher';
+      }
+    }
+  } catch (e) {
+    voucherError = 'Failed to create voucher. Please try again.';
+  }
+}
+
+// Get recent transactions
+let transactions = [];
+try {
+  const transactionResult = await actions.getTransactions({
+    user_id: user.id,
+    user_type: 'merchant',
+    limit: 10
+  });
+  if (transactionResult.data?.success) {
+    transactions = transactionResult.data.transactions;
+  }
+} catch (e) {
+  console.error('Failed to fetch transactions:', e);
+}
+---
+
+<Layout title="Merchant Dashboard - AfriLoyalty">
+  <div class="hero">
+    <h1>🏪 Merchant Dashboard</h1>
+    <p>Welcome back, {user.business_name || user.name}!</p>
+    <div style="margin-top: 1rem;">
+      <a href="/auth/logout" role="button" class="secondary">Logout</a>
+    </div>
+  </div>
+
+  <div class="grid">
+    <!-- Create Voucher Section -->
+    <section class="card">
+      <h3>📝 Create Loyalty Voucher</h3>
+      <p>Issue vouchers to reward your customers with loyalty points</p>
+      
+      {voucherError && (
+        <div style="color: #d32f2f; background: #ffebee; padding: 1rem; border-radius: 4px; margin-bottom: 1rem;">
+          {voucherError}
+        </div>
+      )}
+      
+      {voucherResult?.data?.success && (
+        <div style="color: #2e7d32; background: #e8f5e8; padding: 1rem; border-radius: 4px; margin-bottom: 1rem;">
+          <strong>Voucher Created Successfully!</strong><br/>
+          Code: <code>{voucherResult.data.voucher.code}</code>
+        </div>
+      )}
+      
+      <form method="POST">
+        <input type="hidden" name="action" value="create_voucher" />
+        
+        <label>
+          Points Value
+          <input type="number" name="points_value" required min="1" max="1000" placeholder="50" />
+        </label>
+        
+        <label>
+          Description (Optional)
+          <input type="text" name="description" placeholder="e.g., Welcome bonus, Meal discount" />
+        </label>
+        
+        <label>
+          Expires In (Days)
+          <select name="expires_in_days">
+            <option value="">No expiration</option>
+            <option value="7">7 days</option>
+            <option value="30">30 days</option>
+            <option value="90">90 days</option>
+          </select>
+        </label>
+        
+        <button type="submit" style="margin-top: 1rem;">Create Voucher</button>
+      </form>
+    </section>
+
+    <!-- QR Code Display -->
+    {voucherResult?.data?.success && voucherResult.data.voucher.qr_code_data && (
+      <section class="card">
+        <h3>📱 Voucher QR Code</h3>
+        <div class="qr-code">
+          <img src={voucherResult.data.voucher.qr_code_data} alt="Voucher QR Code" style="max-width: 200px;" />
+          <p><strong>Code:</strong> {voucherResult.data.voucher.code}</p>
+          <p><strong>Points:</strong> {voucherResult.data.voucher.points_value}</p>
+          <button onclick="downloadQR()" role="button" class="secondary">Download QR Code</button>
+        </div>
+      </section>
+    )}
+  </div>
+
+  <!-- Recent Transactions -->
+  <section class="card" style="margin-top: 2rem;">
+    <h3>📊 Recent Transactions</h3>
+    
+    {transactions.length === 0 ? (
+      <p>No transactions yet. Start by creating vouchers for your customers!</p>
+    ) : (
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Customer</th>
+              <th>Type</th>
+              <th>Points</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            {transactions.map((tx) => (
+              <tr>
+                <td>{new Date(tx.created_at).toLocaleDateString()}</td>
+                <td>{tx.customer_name}</td>
+                <td class={tx.transaction_type === 'earned' ? 'earned' : 'redeemed'}>
+                  {tx.transaction_type === 'earned' ? '➕ Earned' : '➖ Redeemed'}
+                </td>
+                <td>{tx.points_amount}</td>
+                <td>{tx.description || '-'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+    
+    <div style="margin-top: 1rem; text-align: center;">
+      <a href="/transactions" role="button" class="secondary">View All Transactions</a>
+    </div>
+  </section>
+</Layout>
+
+<script>
+  function downloadQR() {
+    const img = document.querySelector('.qr-code img');
+    if (img) {
+      const link = document.createElement('a');
+      link.download = 'voucher-qr-code.png';
+      link.href = img.src;
+      link.click();
+    }
+  }
+</script>

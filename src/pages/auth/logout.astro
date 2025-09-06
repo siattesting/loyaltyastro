@@ -1,0 +1,5 @@
+---
+// Clear authentication cookie and redirect to home
+Astro.cookies.delete('auth-token', { path: '/' });
+return Astro.redirect('/?logout=true');
+---

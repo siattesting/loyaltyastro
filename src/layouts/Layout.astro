@@ -1,0 +1,170 @@
+---
+export interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description = "African Loyalty Program - Earn and redeem points at local restaurants and stores" } = Astro.props;
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    
+    <!-- Pico.css for styling -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#1976d2" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <link rel="manifest" href="/manifest.json" />
+    
+    <!-- Custom styles -->
+    <style>
+      :root {
+        --pico-primary-500: #1976d2;
+        --pico-primary-600: #1565c0;
+      }
+      
+      .hero {
+        text-align: center;
+        padding: 2rem 0;
+        background: linear-gradient(135deg, var(--pico-primary-500), var(--pico-primary-600));
+        color: white;
+        margin-bottom: 2rem;
+      }
+      
+      .card {
+        border: 1px solid var(--pico-muted-border-color);
+        border-radius: var(--pico-border-radius);
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        background: var(--pico-card-background-color);
+      }
+      
+      .points-badge {
+        background: var(--pico-primary-500);
+        color: white;
+        padding: 0.25rem 0.75rem;
+        border-radius: 2rem;
+        font-weight: bold;
+        font-size: 0.875rem;
+      }
+      
+      .transaction-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem;
+        border-bottom: 1px solid var(--pico-muted-border-color);
+      }
+      
+      .transaction-item:last-child {
+        border-bottom: none;
+      }
+      
+      .earned {
+        color: var(--pico-primary-500);
+      }
+      
+      .redeemed {
+        color: #d32f2f;
+      }
+      
+      .qr-code {
+        text-align: center;
+        padding: 1rem;
+      }
+      
+      .filters {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+      }
+      
+      .navigation {
+        background: var(--pico-card-background-color);
+        border-bottom: 1px solid var(--pico-muted-border-color);
+        padding: 1rem 0;
+        margin-bottom: 2rem;
+      }
+      
+      .nav-links {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        align-items: center;
+      }
+      
+      .nav-links a {
+        text-decoration: none;
+        padding: 0.5rem 1rem;
+        border-radius: var(--pico-border-radius);
+        transition: background-color 0.2s;
+      }
+      
+      .nav-links a:hover {
+        background: var(--pico-muted-background-color);
+      }
+      
+      .nav-links a.active {
+        background: var(--pico-primary-500);
+        color: white;
+      }
+      
+      @media (max-width: 768px) {
+        .filters {
+          grid-template-columns: 1fr;
+        }
+        
+        .nav-links {
+          flex-direction: column;
+          gap: 0.5rem;
+        }
+        
+        .transaction-item {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 0.5rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="navigation">
+      <div class="container">
+        <div class="nav-links">
+          <a href="/" class="brand"><strong>🍽️ AfriLoyalty</strong></a>
+          <a href="/dashboard">Dashboard</a>
+          <a href="/transactions">Transactions</a>
+          <a href="/auth/login">Login</a>
+          <a href="/auth/register">Register</a>
+        </div>
+      </div>
+    </nav>
+    
+    <main class="container">
+      <slot />
+    </main>
+    
+    <!-- PWA Service Worker -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((registration) => {
+              console.log('SW registered: ', registration);
+            })
+            .catch((registrationError) => {
+              console.log('SW registration failed: ', registrationError);
+            });
+        });
+      }
+    </script>
+  </body>
+</html>

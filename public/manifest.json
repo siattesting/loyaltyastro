@@ -1,0 +1,43 @@
+{
+  "name": "AfriLoyalty - African Loyalty Program",
+  "short_name": "AfriLoyalty",
+  "description": "Earn and redeem loyalty points at your favorite African restaurants and convenience stores",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#1976d2",
+  "background_color": "#ffffff",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "en",
+  "categories": ["business", "finance", "food"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Redeem Voucher",
+      "short_name": "Redeem",
+      "description": "Quickly redeem a loyalty voucher",
+      "url": "/dashboard/customer",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Create Voucher",
+      "short_name": "Create",
+      "description": "Create a new loyalty voucher",
+      "url": "/dashboard/merchant",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

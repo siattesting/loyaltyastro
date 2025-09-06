@@ -1,0 +1,74 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Offline - AfriLoyalty">
+  <div style="text-align: center; padding: 4rem 1rem;">
+    <h1>📱 You're Offline</h1>
+    <p>It looks like you're not connected to the internet right now.</p>
+    
+    <div class="card" style="max-width: 500px; margin: 2rem auto;">
+      <h3>📡 What you can do:</h3>
+      <ul style="text-align: left;">
+        <li>Browse cached pages and content</li>
+        <li>View your transaction history (if previously loaded)</li>
+        <li>Prepare voucher codes for when you're back online</li>
+        <li>Review your loyalty point balance</li>
+      </ul>
+      
+      <h3>🔄 When you reconnect:</h3>
+      <ul style="text-align: left;">
+        <li>Your pending actions will be automatically synced</li>
+        <li>New transactions will be updated</li>
+        <li>QR codes can be scanned and processed</li>
+      </ul>
+    </div>
+    
+    <div style="margin-top: 2rem;">
+      <button onclick="checkConnection()" role="button">
+        🔄 Try Again
+      </button>
+      
+      <a href="/" role="button" class="secondary" style="margin-left: 1rem;">
+        🏠 Go Home
+      </a>
+    </div>
+    
+    <div id="connection-status" style="margin-top: 1rem; padding: 1rem; border-radius: 4px; display: none;">
+    </div>
+  </div>
+</Layout>
+
+<script>
+  function checkConnection() {
+    const statusDiv = document.getElementById('connection-status');
+    statusDiv.style.display = 'block';
+    
+    if (navigator.onLine) {
+      statusDiv.style.background = '#e8f5e8';
+      statusDiv.style.color = '#2e7d32';
+      statusDiv.innerHTML = '✅ You\'re back online! Refreshing...';
+      
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } else {
+      statusDiv.style.background = '#ffebee';
+      statusDiv.style.color = '#d32f2f';
+      statusDiv.innerHTML = '❌ Still offline. Please check your internet connection.';
+      
+      setTimeout(() => {
+        statusDiv.style.display = 'none';
+      }, 3000);
+    }
+  }
+  
+  // Auto-check connection status
+  window.addEventListener('online', () => {
+    checkConnection();
+  });
+  
+  window.addEventListener('offline', () => {
+    console.log('App went offline');
+  });
+</script></Layout>

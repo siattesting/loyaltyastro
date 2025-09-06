@@ -1,0 +1,247 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { getCurrentUser } from '../lib/auth';
+import { actions } from 'astro:actions';
+
+// Check authentication
+const user = getCurrentUser(Astro);
+if (!user) {
+  return Astro.redirect('/auth/login');
+}
+
+// Get query parameters for filtering
+const url = new URL(Astro.request.url);
+const transactionType = url.searchParams.get('type') || 'all';
+const dateFrom = url.searchParams.get('from') || '';
+const dateTo = url.searchParams.get('to') || '';
+const page = parseInt(url.searchParams.get('page') || '1');
+const limit = 20;
+const offset = (page - 1) * limit;
+
+// Get transactions
+let transactions = [];
+let totalCount = 0;
+try {
+  const result = await actions.getTransactions({
+    user_id: user.id,
+    user_type: user.user_type,
+    transaction_type: transactionType === 'all' ? undefined : transactionType,
+    date_from: dateFrom || undefined,
+    date_to: dateTo || undefined,
+    limit: limit,
+    offset: offset
+  });
+  
+  if (result.data?.success) {
+    transactions = result.data.transactions;
+    totalCount = result.data.transactions.length; // Note: In real app, you'd get total count separately
+  }
+} catch (e) {
+  console.error('Failed to fetch transactions:', e);
+}
+
+// Pagination
+const totalPages = Math.ceil(totalCount / limit);
+const hasNextPage = page < totalPages;
+const hasPrevPage = page > 1;
+---
+
+<Layout title="Transactions - AfriLoyalty">
+  <div class="hero">
+    <h1>📊 Transaction History</h1>
+    <p>View and filter your loyalty point transactions</p>
+  </div>
+
+  <!-- Filters -->
+  <section class="card">
+    <h3>🔍 Filter Transactions</h3>
+    
+    <form method="GET" class="filters">
+      <label>
+        Transaction Type
+        <select name="type">
+          <option value="all" selected={transactionType === 'all'}>All Transactions</option>
+          <option value="earned" selected={transactionType === 'earned'}>Points Earned</option>
+          <option value="redeemed" selected={transactionType === 'redeemed'}>Points Redeemed</option>
+        </select>
+      </label>
+      
+      <label>
+        From Date
+        <input type="date" name="from" value={dateFrom} />
+      </label>
+      
+      <label>
+        To Date
+        <input type="date" name="to" value={dateTo} />
+      </label>
+      
+      <div style="display: flex; gap: 0.5rem; align-items: end;">
+        <button type="submit">Apply Filters</button>
+        <a href="/transactions" role="button" class="secondary">Clear</a>
+      </div>
+    </form>
+    
+    <!-- Quick date filters -->
+    <div style="margin-top: 1rem;">
+      <strong>Quick filters:</strong>
+      <a href="/transactions?type=all&from={new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}" class="secondary" role="button" style="margin: 0 0.25rem; padding: 0.25rem 0.5rem; font-size: 0.875rem;">Last 7 days</a>
+      <a href="/transactions?type=all&from={new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}" class="secondary" role="button" style="margin: 0 0.25rem; padding: 0.25rem 0.5rem; font-size: 0.875rem;">Last 30 days</a>
+      <a href="/transactions?type=all&from={new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}" class="secondary" role="button" style="margin: 0 0.25rem; padding: 0.25rem 0.5rem; font-size: 0.875rem;">Last 90 days</a>
+    </div>
+  </section>
+
+  <!-- Transactions Table -->
+  <section class="card">
+    <h3>📋 Transactions</h3>
+    
+    {transactions.length === 0 ? (
+      <div style="text-align: center; padding: 2rem;">
+        <p>No transactions found for the selected criteria.</p>
+        {user.user_type === 'customer' ? (
+          <a href="/dashboard/customer" role="button">Start Earning Points</a>
+        ) : (
+          <a href="/dashboard/merchant" role="button">Create Vouchers</a>
+        )}
+      </div>
+    ) : (
+      <>
+        <div style="overflow-x: auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Date & Time</th>
+                <th>{user.user_type === 'customer' ? 'Merchant' : 'Customer'}</th>
+                <th>Type</th>
+                <th>Points</th>
+                <th>Description</th>
+                <th>Voucher Code</th>
+              </tr>
+            </thead>
+            <tbody>
+              {transactions.map((tx) => (
+                <tr>
+                  <td>
+                    {new Date(tx.created_at).toLocaleDateString()}<br/>
+                    <small>{new Date(tx.created_at).toLocaleTimeString()}</small>
+                  </td>
+                  <td>
+                    {user.user_type === 'customer' 
+                      ? (tx.business_name || tx.merchant_name)
+                      : tx.customer_name
+                    }<br/>
+                    {user.user_type === 'customer' && tx.business_name && (
+                      <small>{tx.merchant_name}</small>
+                    )}
+                  </td>
+                  <td>
+                    <span class={tx.transaction_type === 'earned' ? 'earned' : 'redeemed'}>
+                      {tx.transaction_type === 'earned' 
+                        ? '➕ Earned' 
+                        : '➖ Redeemed'
+                      }
+                    </span>
+                  </td>
+                  <td>
+                    <strong class={tx.transaction_type === 'earned' ? 'earned' : 'redeemed'}>
+                      {tx.transaction_type === 'earned' ? '+' : '-'}{tx.points_amount}
+                    </strong>
+                  </td>
+                  <td>{tx.description || '-'}</td>
+                  <td>
+                    {tx.voucher_code ? (
+                      <code style="font-size: 0.75rem;">{tx.voucher_code}</code>
+                    ) : '-'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        
+        <!-- Pagination -->
+        {totalPages > 1 && (
+          <div style="margin-top: 2rem; text-align: center; display: flex; justify-content: center; gap: 0.5rem; align-items: center;">
+            {hasPrevPage && (
+              <a href={`/transactions?page=${page - 1}&type=${transactionType}&from=${dateFrom}&to=${dateTo}`} role="button" class="secondary">
+                ← Previous
+              </a>
+            )}
+            
+            <span>Page {page} of {totalPages}</span>
+            
+            {hasNextPage && (
+              <a href={`/transactions?page=${page + 1}&type=${transactionType}&from=${dateFrom}&to=${dateTo}`} role="button" class="secondary">
+                Next →
+              </a>
+            )}
+          </div>
+        )}
+      </>
+    )}
+  </section>
+
+  <!-- Summary Statistics -->
+  <section class="card">
+    <h3>📈 Summary</h3>
+    <div class="grid">
+      <div style="text-align: center;">
+        <h4 class="earned">Points Earned</h4>
+        <p style="font-size: 1.5rem; font-weight: bold; color: var(--pico-primary-500);">
+          +{transactions.filter(tx => tx.transaction_type === 'earned').reduce((sum, tx) => sum + tx.points_amount, 0)}
+        </p>
+      </div>
+      <div style="text-align: center;">
+        <h4 class="redeemed">Points Redeemed</h4>
+        <p style="font-size: 1.5rem; font-weight: bold; color: #d32f2f;">
+          -{transactions.filter(tx => tx.transaction_type === 'redeemed').reduce((sum, tx) => sum + tx.points_amount, 0)}
+        </p>
+      </div>
+      <div style="text-align: center;">
+        <h4>Total Transactions</h4>
+        <p style="font-size: 1.5rem; font-weight: bold;">
+          {transactions.length}
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Back to Dashboard -->
+  <div style="text-align: center; margin-top: 2rem;">
+    <a href={`/dashboard/${user.user_type}`} role="button" class="secondary">
+      ← Back to Dashboard
+    </a>
+  </div>
+</Layout>
+
+<style>
+  .filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    align-items: end;
+  }
+  
+  @media (max-width: 768px) {
+    .filters {
+      grid-template-columns: 1fr;
+    }
+    
+    table {
+      font-size: 0.875rem;
+    }
+    
+    table th,
+    table td {
+      padding: 0.5rem 0.25rem;
+    }
+  }
+  
+  .earned {
+    color: var(--pico-primary-500);
+  }
+  
+  .redeemed {
+    color: #d32f2f;
+  }
+</style>

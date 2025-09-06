@@ -1,0 +1,125 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { actions } from 'astro:actions';
+
+let result = null;
+let error = null;
+
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+    result = await actions.register(formData);
+    
+    if (result.data?.success) {
+      // Redirect to login page on successful registration
+      return Astro.redirect('/auth/login?registered=true');
+    } else {
+      error = result.data?.error || 'Registration failed';
+    }
+  } catch (e) {
+    error = 'Registration failed. Please try again.';
+  }
+}
+---
+
+<Layout title="Register - AfriLoyalty">
+  <div class="card" style="max-width: 600px; margin: 2rem auto;">
+    <h2>Create Your Account</h2>
+    <p>Join AfriLoyalty to start earning and redeeming loyalty points</p>
+    
+    {error && (
+      <div style="color: #d32f2f; background: #ffebee; padding: 1rem; border-radius: 4px; margin-bottom: 1rem;">
+        {error}
+      </div>
+    )}
+    
+    <form method="POST">
+      <div class="grid">
+        <label>
+          Email Address
+          <input type="email" name="email" required placeholder="your@email.com" />
+        </label>
+        
+        <label>
+          Password
+          <input type="password" name="password" required minlength="6" placeholder="Choose a strong password" />
+        </label>
+      </div>
+      
+      <div class="grid">
+        <label>
+          Full Name
+          <input type="text" name="name" required placeholder="Your full name" />
+        </label>
+        
+        <label>
+          Phone Number (Optional)
+          <input type="tel" name="phone" placeholder="+234 xxx xxx xxxx" />
+        </label>
+      </div>
+      
+      <label>
+        Account Type
+        <select name="user_type" required>
+          <option value="">Select account type</option>
+          <option value="customer">Customer - Earn and redeem points</option>
+          <option value="merchant">Merchant - Issue loyalty vouchers</option>
+        </select>
+      </label>
+      
+      <div id="merchant-fields" style="display: none;">
+        <h4>Business Information</h4>
+        <label>
+          Business Name
+          <input type="text" name="business_name" placeholder="Your restaurant or store name" />
+        </label>
+        
+        <label>
+          Business Address
+          <textarea name="business_address" placeholder="Complete business address" rows="3"></textarea>
+        </label>
+      </div>
+      
+      <button type="submit" style="margin-top: 1rem;">Create Account</button>
+    </form>
+    
+    <p style="text-align: center; margin-top: 1rem;">
+      Already have an account? <a href="/auth/login">Sign in here</a>
+    </p>
+  </div>
+</Layout>
+
+<script>
+  // Show/hide merchant fields based on account type
+  const userTypeSelect = document.querySelector('select[name="user_type"]');
+  const merchantFields = document.getElementById('merchant-fields');
+  const businessNameInput = document.querySelector('input[name="business_name"]');
+  const businessAddressInput = document.querySelector('textarea[name="business_address"]');
+  
+  userTypeSelect?.addEventListener('change', (e) => {
+    const isMerchant = e.target.value === 'merchant';
+    merchantFields.style.display = isMerchant ? 'block' : 'none';
+    
+    // Update required attribute
+    if (businessNameInput) {
+      businessNameInput.required = isMerchant;
+    }
+    if (businessAddressInput) {
+      businessAddressInput.required = isMerchant;
+    }
+  });
+</script>
+
+<style>
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+  
+  @media (max-width: 768px) {
+    .grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
